@@ -64,14 +64,14 @@ app.post('/send-notification', async (req, res) => {
 // 특정 사용자에게 푸시 알림을 보내는 함수
 async function sendPushNotification(userId, message) {
   // Firestore에서 사용자의 FCM 토큰을 조회
-  const userTokenSnapshot = await admin.firestore().collection('user_tokens').doc(userId).get();
+  const userTokenSnapshot = await admin.firestore().collection('User').doc(userId).get();
 
   if (!userTokenSnapshot.exists) {
     console.log(`No token found for user: ${userId}`);
     return; // 함수 실행을 여기서 중단
   }
 
-  const userToken = userTokenSnapshot.data().token;
+  const userToken = userTokenSnapshot.data().fcmToken;
 
   console.log(`usrToken: ${userToken} , userId: ${userId}`)
   // 메시지 구성
