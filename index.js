@@ -22,25 +22,25 @@ app.get('/', (req, res) => {
     console.log('hello world!')
   });
 
-app.post('/register-token', async (req, res) => {
-    const { token } = req.body;
-    if (!token) {
-        return res.status(400).send('Token is required');
-    }
+// app.post('/register-token', async (req, res) => {
+//     const { token } = req.body;
+//     if (!token) {
+//         return res.status(400).send('Token is required');
+//     }
     
-    // Firestore에 토큰 저장
-    try {
-        // await db.collection('user_tokens').doc('good').add({        
-        await db.collection('user_tokens').add({ // 임시로 위에 걸로
-            token,
-            createdAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-        res.send({ message: 'Token registered successfully' });
-    } catch (error) {
-        console.error('Error saving token to Firestore:', error);
-        res.status(500).send('Internal Server Error');
-    }
-});
+//     // Firestore에 토큰 저장
+//     try {
+//         // await db.collection('user_tokens').doc('good').add({        
+//         await db.collection('user_tokens').add({ // 임시로 위에 걸로
+//             token,
+//             createdAt: admin.firestore.FieldValue.serverTimestamp()
+//         });
+//         res.send({ message: 'Token registered successfully' });
+//     } catch (error) {
+//         console.error('Error saving token to Firestore:', error);
+//         res.status(500).send('Internal Server Error');
+//     }
+// });
 
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
@@ -48,11 +48,11 @@ app.listen(port, () => {
 
 
 app.post('/send-notification', async (req, res) => {
-    const { userId, message } = req.body;
+    const { userId, message, chatRoomId } = req.body;
     
     try {
       // 푸시 알림 보내는 함수 호출
-      await sendPushNotification(userId, message);
+      await sendPushNotification(userId, message, chatRoomId);
       res.send({ message: 'Notification sent successfully' });
       
     } catch (error) {
@@ -62,25 +62,54 @@ app.post('/send-notification', async (req, res) => {
   });
 
 // 특정 사용자에게 푸시 알림을 보내는 함수
-async function sendPushNotification(userId, message) {
-  // Firestore에서 사용자의 FCM 토큰을 조회
-  const userTokenSnapshot = await admin.firestore().collection('User').doc(userId).get();
+async function sendPushNotification(userId, message, chatRoomId) {
 
-  if (!userTokenSnapshot.exists) {
+  // Firestore에서 사용자의 FCM 토큰 및 유저 정보 조회
+  const userSnapshot = await admin.firestore().collection('User').doc(userId).get();
+  
+  if (!userSnapshot.exists) {
     console.log(`No token found for user: ${userId}`);
     return; // 함수 실행을 여기서 중단
   }
+  const userData = userSnapshot.data();
+  const userToken = userData.fcmToken;
+  const nickname = userData.nickname;
+  const style = userData.style;
+  const profileURL = userData.profileURL;
 
-  const userToken = userTokenSnapshot.data().fcmToken;
+  // 채팅방 조회
+  const chatRoomSnapshot = await db.collection('User').doc(userId).collection('chatRoomList').doc(chatRoomId).get();
 
-  console.log(`usrToken: ${userToken} , userId: ${userId}`)
+  if (!chatRoomSnapshot.exists) {
+    console.log(`No chat room found for user: ${userId} with chatRoomId: ${chatRoomId}`);
+    return; // 채팅방이 없으면 함수 실행 중단
+  }
+
+  const chatRoomData = chatRoomSnapshot.data();
+  const partnerId = chatRoomData.partnerId;
+  const noticeBoardId = chatRoomData.noticeBoardId;
+  const noticeBoardTitle = chatRoomData.noticeBoardTitle;
+
+  console.log(`usrToken: ${userToken} , userId: ${userId}, chatRoomId: ${chatRoomId}, partnerId: ${partnerId}, noticeBoardTitle: ${noticeBoardTitle}, nickname: ${nickname}, Style: ${style}`)
+  
   // 메시지 구성
   const payload = {
     notification: {
-      title: '새 알림',
+      title: nickname,
       body: message,
     },
     token: userToken,
+    data: {
+      chatRoomId: chatRoomId,
+      userId: userId,
+      partnerId: partnerId,
+      noticeBoardTitle: noticeBoardTitle,
+      noticeBoardId: noticeBoardId,
+      nickname: nickname,
+      style: style,
+      profileURL: profileURL,
+      message: message
+    }
   };
 
   // FCM을 통해 푸시 알림 보내기
