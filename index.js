@@ -96,7 +96,7 @@ async function sendPushNotification(userId, message, chatRoomId) {
   const payload = {
     notification: {
       title: nickname,
-      body: message,
+      body: message
     },
     token: userToken,
     data: {
@@ -109,7 +109,14 @@ async function sendPushNotification(userId, message, chatRoomId) {
       style: style,
       profileURL: profileURL,
       message: message
-    }
+    },
+    apns: {
+      payload: {
+        aps: {
+          sound: "default" // iOS 알림 사운드 설정
+        }
+      }
+    },
   };
 
   // FCM을 통해 푸시 알림 보내기
