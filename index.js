@@ -4,6 +4,7 @@ const admin = require('firebase-admin');
 
 // Firebase Admin SDK 초기화
 const serviceAccount = require('./bookbridge-a9403-firebase-adminsdk-o57n3-4f4b7056e3.json');
+const { parseNumbers } = require('xml2js/lib/processors');
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
@@ -51,6 +52,8 @@ app.post('/send-notification', async (req, res) => {
     const { userId, message, chatRoomId } = req.body;
     
     try {
+      // 2초 동안 지연시키는 Promise 생성
+      await new Promise(resolve => setTimeout(resolve, 2000));
       // 푸시 알림 보내는 함수 호출
       await sendPushNotification(userId, message, chatRoomId);
       res.send({ message: 'Notification sent successfully' });
@@ -89,8 +92,8 @@ async function sendPushNotification(userId, message, chatRoomId) {
   const partnerId = chatRoomData.partnerId;
   const noticeBoardId = chatRoomData.noticeBoardId;
   const noticeBoardTitle = chatRoomData.noticeBoardTitle;
-
-  console.log(`usrToken: ${userToken} , userId: ${userId}, chatRoomId: ${chatRoomId}, partnerId: ${partnerId}, noticeBoardTitle: ${noticeBoardTitle}, nickname: ${nickname}, Style: ${style}`)
+  const count = parseNumbers(await sumNewCounts(userId), 0); //bage Count생성
+  // console.log(`usrToken: ${userToken} , userId: ${userId}, chatRoomId: ${chatRoomId}, partnerId: ${partnerId}, noticeBoardTitle: ${noticeBoardTitle}, nickname: ${nickname}, Style: ${style}`)
   
   // 메시지 구성
   const payload = {
@@ -113,7 +116,8 @@ async function sendPushNotification(userId, message, chatRoomId) {
     apns: {
       payload: {
         aps: {
-          sound: "default" // iOS 알림 사운드 설정
+          sound: "default", // iOS 알림 사운드 설정
+          badge : count
         }
       }
     },
@@ -129,3 +133,23 @@ async function sendPushNotification(userId, message, chatRoomId) {
     });
 }
 
+//chatRoomList 컬렉션 newCount 카운트 반환 함수
+async function sumNewCounts(userId) {
+  const chatRoomListRef = admin.firestore().collection('User').doc(userId).collection('chatRoomList');
+  try {
+    const snapshot = await chatRoomListRef.get();
+    let totalNewCount = 0; 
+    
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.newCount && typeof data.newCount === 'number') {
+        totalNewCount += data.newCount;
+      }
+    });
+    // console.log(`Total newCount for user ${userId}: ${totalNewCount}`);
+    return totalNewCount;
+  } catch (error) {
+    console.error("Error summing newCounts:", error);
+    return null;
+  }
+}
