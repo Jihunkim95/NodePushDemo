@@ -5,6 +5,7 @@ const admin = require('firebase-admin');
 // Firebase Admin SDK 초기화
 const serviceAccount = require('./bookbridge-a9403-firebase-adminsdk-o57n3-4f4b7056e3.json');
 const { parseNumbers } = require('xml2js/lib/processors');
+const { parseString } = require('xml2js');
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
@@ -49,13 +50,13 @@ app.listen(port, () => {
 
 
 app.post('/send-notification', async (req, res) => {
-    const { userId, message, chatRoomId } = req.body;
+    const { userId, partnerUserId, message, chatRoomId } = req.body;
     
     try {
       // 2초 동안 지연시키는 Promise 생성
       await new Promise(resolve => setTimeout(resolve, 2000));
       // 푸시 알림 보내는 함수 호출
-      await sendPushNotification(userId, message, chatRoomId);
+      await sendPushNotification(userId, partnerUserId, message, chatRoomId);
       res.send({ message: 'Notification sent successfully' });
       
     } catch (error) {
@@ -65,35 +66,43 @@ app.post('/send-notification', async (req, res) => {
   });
 
 // 특정 사용자에게 푸시 알림을 보내는 함수
-async function sendPushNotification(userId, message, chatRoomId) {
+async function sendPushNotification(userId, partnerUserId ,message, chatRoomId) {
 
-  // Firestore에서 사용자의 FCM 토큰 및 유저 정보 조회
+  // Firestore에서 사용자의 FCM 토큰 및 상대방 정보 조회
   const userSnapshot = await admin.firestore().collection('User').doc(userId).get();
   
-  if (!userSnapshot.exists) {
-    console.log(`No token found for user: ${userId}`);
+  // Firestore에서 내 정보 조회
+  const partnerSnapshot = await admin.firestore().collection('User').doc(partnerUserId).get();
+
+  if (!userSnapshot.exists || !partnerSnapshot.exists) {
+    console.log(`No token found for user: ${partnerUserId}`);
     return; // 함수 실행을 여기서 중단
   }
-  const userData = userSnapshot.data();
-  const userToken = userData.fcmToken;
+  const userData = userSnapshot.data();  
+  const partnerData = partnerSnapshot.data();
+
   const nickname = userData.nickname;
+  const partnerToken = partnerData.fcmToken;
   const style = userData.style;
   const profileURL = userData.profileURL;
+  const reviews = partnerData.reviews;
 
+  // console.log(profileURL)
   // 채팅방 조회
-  const chatRoomSnapshot = await db.collection('User').doc(userId).collection('chatRoomList').doc(chatRoomId).get();
+  const chatRoomSnapshot = await db.collection('User').doc(partnerUserId).collection('chatRoomList').doc(chatRoomId).get();
 
   if (!chatRoomSnapshot.exists) {
-    console.log(`No chat room found for user: ${userId} with chatRoomId: ${chatRoomId}`);
+    console.log(`No chat room found for user: ${partnerUserId} with chatRoomId: ${chatRoomId}`);
     return; // 채팅방이 없으면 함수 실행 중단
   }
 
   const chatRoomData = chatRoomSnapshot.data();
-  const partnerId = chatRoomData.partnerId;
+  const partnerId = chatRoomData.userId;
   const noticeBoardId = chatRoomData.noticeBoardId;
   const noticeBoardTitle = chatRoomData.noticeBoardTitle;
-  const count = parseNumbers(await sumNewCounts(userId), 0); //bage Count생성
-  // console.log(`usrToken: ${userToken} , userId: ${userId}, chatRoomId: ${chatRoomId}, partnerId: ${partnerId}, noticeBoardTitle: ${noticeBoardTitle}, nickname: ${nickname}, Style: ${style}`)
+  const count = parseNumbers(await sumNewCounts(partnerId), 0); //bage Count생성
+  // console.log(`partnerToken: ${partnerToken} , userId: ${userId}, chatRoomId: ${chatRoomId}, partnerId: ${partnerId}, noticeBoardTitle: ${noticeBoardTitle}, nickname: ${nickname}, Style: ${style}, profileURL: ${profileURL}`)
+  // console.log(`reviews: ${reviews} `);
   
   // 메시지 구성
   const payload = {
@@ -101,17 +110,20 @@ async function sendPushNotification(userId, message, chatRoomId) {
       title: nickname,
       body: message
     },
-    token: userToken,
+    token: partnerToken,
     data: {
       chatRoomId: chatRoomId,
-      userId: userId,
-      partnerId: partnerId,
+      userId: partnerUserId,
+      partnerId: userId,
       noticeBoardTitle: noticeBoardTitle,
       noticeBoardId: noticeBoardId,
       nickname: nickname,
       style: style,
       profileURL: profileURL,
-      message: message
+      message: message,
+      review0 : reviews[0].toString(),
+      review1 : reviews[1].toString(),
+      review2 : reviews[2].toString()
     },
     apns: {
       payload: {
@@ -134,8 +146,8 @@ async function sendPushNotification(userId, message, chatRoomId) {
 }
 
 //chatRoomList 컬렉션 newCount 카운트 반환 함수
-async function sumNewCounts(userId) {
-  const chatRoomListRef = admin.firestore().collection('User').doc(userId).collection('chatRoomList');
+async function sumNewCounts(partnerId) {
+  const chatRoomListRef = admin.firestore().collection('User').doc(partnerId).collection('chatRoomList');
   try {
     const snapshot = await chatRoomListRef.get();
     let totalNewCount = 0; 
@@ -146,7 +158,7 @@ async function sumNewCounts(userId) {
         totalNewCount += data.newCount;
       }
     });
-    // console.log(`Total newCount for user ${userId}: ${totalNewCount}`);
+    // console.log(`Total newCount for user ${partnerId}: ${totalNewCount}`);
     return totalNewCount;
   } catch (error) {
     console.error("Error summing newCounts:", error);
