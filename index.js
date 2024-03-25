@@ -101,6 +101,7 @@ async function sendPushNotification(userId, partnerUserId ,message, chatRoomId) 
   const noticeBoardId = chatRoomData.noticeBoardId;
   const noticeBoardTitle = chatRoomData.noticeBoardTitle;
   const count = parseNumbers(await sumNewCounts(partnerId), 0); //bage Count생성
+
   // console.log(`partnerToken: ${partnerToken} , userId: ${userId}, chatRoomId: ${chatRoomId}, partnerId: ${partnerId}, noticeBoardTitle: ${noticeBoardTitle}, nickname: ${nickname}, Style: ${style}, profileURL: ${profileURL}`)
   // console.log(`reviews: ${reviews} `);
   
