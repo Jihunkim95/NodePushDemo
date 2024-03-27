@@ -92,8 +92,10 @@ async function sendPushNotification(userId, message, chatRoomId) {
   const partnerId = chatRoomData.partnerId;
   const noticeBoardId = chatRoomData.noticeBoardId;
   const noticeBoardTitle = chatRoomData.noticeBoardTitle;
-  const count = parseNumbers(await sumNewCounts(userId), 0); //bage Count생성
-  // console.log(`usrToken: ${userToken} , userId: ${userId}, chatRoomId: ${chatRoomId}, partnerId: ${partnerId}, noticeBoardTitle: ${noticeBoardTitle}, nickname: ${nickname}, Style: ${style}`)
+  const count = parseNumbers(await sumNewCounts(partnerId), 0); //bage Count생성
+
+  // console.log(`partnerToken: ${partnerToken} , userId: ${userId}, chatRoomId: ${chatRoomId}, partnerId: ${partnerId}, noticeBoardTitle: ${noticeBoardTitle}, nickname: ${nickname}, Style: ${style}, profileURL: ${profileURL}`)
+  // console.log(`reviews: ${reviews} `);
   
   // 메시지 구성
   const payload = {
